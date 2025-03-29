@@ -8,36 +8,16 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.ref, 'main')
     steps:
-      - uses: actions/setup-go@v1
+      - uses: actions/checkout@v3
+        name: Check out code
+    
+      - uses: mr-smithers-excellent/docker-build-push@v6
+        name: Build & push Docker image
         with:
-          go-version: '1.18.x'
-
-      - uses: actions/checkout@v1
-
-      - name: Docker Build
-        working-directory: .
-        run: docker build -t idp-service:latest .
-
-      - name: Docker Tag Latest
-        working-directory: .
-        run: docker tag idp-service:latest jonathan99/idp-service:latest
-
-      - name: Docker Tag Release
-        run: |
-          TAG=$(git rev-parse --short HEAD)
-          docker tag idp-service:latest jonathan99/idp-service:$TAG
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
+          image: jonathan99/idp-service
+          tags: v1, latest
+          directory: .
+          registry: docker.io
+          dockerfile: Dockerfile
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Docker Push Latest
-        working-directory: .
-        run: docker push jonathan99/idp-service:latest
-
-      - name: Docker Push Release Tag
-        working-directory: .
-        run: |
-          TAG=$(git rev-parse --short HEAD)
-          docker push jonathan99/idp-service:$TAG
