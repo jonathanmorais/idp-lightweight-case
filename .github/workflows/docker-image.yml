@@ -19,11 +19,7 @@ jobs:
 
       - name: Docker Build
         working-directory: cr-service
-        run: docker build -t idp-app:latest .
-
-      - name: Docker Tag Latest
-        working-directory: cr-service
-        run: docker tag idp-app:latest jonathan99/idp-app:latest
+        run: docker build . --file Dockerfile --tag idp-app:latest
 
       - name: Docker Tag Release
         run: |
