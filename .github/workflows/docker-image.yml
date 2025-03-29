@@ -1,37 +1,81 @@
-name: Docker Image CI
-
+name: 'IDP ci'
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
-
+    types: [ opened, reopened ]
 jobs:
+  unit-test:
+    strategy:
+      matrix:
+        go-version: [1.18.x]
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+
+      - uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: setup GOPATH into PATH
+        run: |
+          echo "::set-env name=GOPATH::$(go env GOPATH)"
+          echo "::add-path::$(go env GOPATH)/bin"
+        shell: bash
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+      - uses: actions/checkout@v2
+
+      - name: Run's Golint
+        working-directory: cr-service
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          go get -u golang.org/x/lint/golint
+          # golint -set_exit_status ./...
+
+      - name: Install dependencies
+        working-directory: .
+        run: go get -u
+
+      - name: Test
+        working-directory: .
+        run: go test -v
 
   build-docker-artifacts:
+    needs: [ unit-test ]
     runs-on: ubuntu-latest
+    if: contains(github.ref, 'main')
     steps:
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.18.x'
+
+      - uses: actions/checkout@v1
+
       - name: Docker Build
-        working-directory: .
-        run: docker build . --file Dockerfile --tag idp-app:latest
+        working-directory: cr-service
+        run: docker build -t idp-service:latest .
+
+      - name: Docker Tag Latest
+        working-directory: idp-service
+        run: docker tag idp-service:latest jonathan99/idp-service:latest
 
       - name: Docker Tag Release
         run: |
           TAG=$(git rev-parse --short HEAD)
-          docker tag idp-app:latest jonathan99/idp-app:$TAG
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+          docker tag idp-service:latest jonathan99/idp-service:$TAG
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
       - name: Docker Push Latest
-        working-directory: idp-app
-        run: docker push jonathan99/idp-app:latest
+        working-directory: idp-service
+        run: docker push jonathan99/idp-service:latest
 
       - name: Docker Push Release Tag
-        working-directory: idp-app
+        working-directory: idp-service
         run: |
           TAG=$(git rev-parse --short HEAD)
-          docker push jonathan99/idp-app:$TAG
-    
+          docker push jonathan99/idp-service:$TAG
